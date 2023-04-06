@@ -1,47 +1,51 @@
 #!/usr/bin/env bash
+# sets up your web servers for the deployment of web_static
 
-# set the web server
-apt update -y
+# Update servers repository and install nginx
+apt update
+apt -y install nginx
 
-command -v nginx > testfile.txt
-file="testfile.txt"
+# create project directories
+mkdir -p /data/web_static/shared/
+mkdir -p /data/web_static/releases/test/
 
-if [ ! -s "$file" ]
-then	
-	apt install nginx -y
-fi
-rm $file
+# create initial html
+cat << EOF | tee /data/web_static/releases/test/index.html
+<html>
+  <head>
+  </head>
+  <body>
+    Holberton School
+  </body>
+</html>
+EOF
 
-# create the necessary directories
-mkdir -p /data/web_static/release/test
-mkdir -p /data/web_static/shared
+# create a symlink to ..release/test/ dir
+ln -sf /data/web_static/releases/test/ /data/web_static/current
 
-# create a fake HTML file for testing purposes
-echo -e "<html>\n  <head>\n  </head>\n  <body>\n    Holberton School\n  </body>\n</html>" > /data/web_static/releases/test/index.html
-ln -sf /data/web_static/release/test/ /data/web_static/current
-
-# give ownership of the/data/ folder to the ubuntu user and group
+# give ownership of /data/ to the current user
 chown -R ubuntu:ubuntu /data/
-chgrp -R ubuntu /data/
-printf %s "server {
-    listen 80 default_server;
-    listen [::]:80 default_server;
-    add_header X-Served-By $HOSTNAME;
-    root   /var/www/html;
-    index  index.html index.htm;
-    location /hbnb_static {
-        alias /data/web_static/current;
-        index index.html index.htm;
-    }
-    location /redirect_me {
-        return 301 http://cuberule.com/;
-    }
-    error_page 404 /404.html;
-    location /404 {
-      root /var/www/html;
-      internal;
-    }
-}" > /etc/nginx/sites-available/default
 
-# restart nginx to apply the changes
-service nginx restart
+# set up nginx server configuration
+SERVER=$(hostname)
+
+SERVER_CONFIG=\
+"server {
+        listen 80 default_server;
+        listen [::]:80 default_server;
+        root /var/www/html;
+        index index.html index.htm index.nginx-debian.html;
+        server_name _;
+        location / {
+                add_header X-Served-By '$SERVER';
+                try_files \$uri \$uri/ =404;
+        }
+	location /hbnb_static {
+                add_header X-Served-By '$SERVER';
+		alias /data/web_static/current;
+	}
+}"
+bash -c "echo -e '$SERVER_CONFIG' > /etc/nginx/sites-available/default"
+/etc/init.d/nginx restart
+
+exit 0
