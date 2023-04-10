@@ -1,36 +1,31 @@
 #!/usr/bin/python3
-# Fabric script that distributes an archive to my web servers using do_deploy
+"""Distributes an archive to your web servers, using the function do_deploy"""
+from fabric.contrib import files
+from fabric.api import env, put, run
+import os
 
-from fabric.api import put, env, run
-import os.path
-
-env.user = 'ubuntu'
-env.hosts = '54.236.33.47', '35.175.135.250']
+env.hosts = ['54.236.33.47', '35.175.135.250']
 
 
 def do_deploy(archive_path):
-    """Distribute archive to servers"""
-    if os.path.exists(archive_path) is False:
+    """Function for deploy"""
+    if not os.path.exists(archive_path):
         return False
 
-    name = archive_path.split('/')
-    n_name = name[1]
-    m_name = n_name.split('.')
-    new_name = m_name[0]
+    data_path = '/data/web_static/releases/'
+    tmp = archive_path.split('.')[0]
+    name = tmp.split('/')[1]
+    dest = data_path + name
 
-    upload = "/tmp/" + n_name
-    arch_fold = "/data/web_static/releases/" + new_name
-
-    put(archive_path, upload)
-
-    run('mkdir -p ' + arch_fold)
-    run('tar -xzf /tmp/{} -C {}/'.format(n_name, arch_fold))
-    run('rm {}'.format(upload))
-
-    move = 'mv ' + arch_fold + '/web_static/* ' + arch_fold + '/'
-    run(move)
-
-    run('rm -fr ' + arch_fold + '/web_static')
-    run('rm -fr /data/web_static/current')
-    run('ln -s ' + arch_fold + ' /data/web_static/current')
-    return True
+    try:
+        put(archive_path, '/tmp')
+        run('mkdir -p {}'.format(dest))
+        run('tar -xzf /tmp/{}.tgz -C {}'.format(name, dest))
+        run('rm -f /tmp/{}.tgz'.format(name))
+        run('mv {}/web_static/* {}/'.format(dest, dest))
+        run('rm -rf {}/web_static'.format(dest))
+        run('rm -rf /data/web_static/current')
+        run('ln -s {} /data/web_static/current'.format(dest))
+        return True
+    except Exception:
+        return False
